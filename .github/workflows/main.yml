@@ -1,0 +1,56 @@
+name: Run Gamma Login Bot
+
+# Allows this workflow to be triggered:
+#   1. Manually via GitHub UI
+#   2. Via Power Automate HTTP POST (workflow_dispatch)
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'uat'
+        type: choice
+        options:
+          - uat
+          - live
+
+jobs:
+  run-login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run Gamma Login
+        env:
+          GAMMA_ENV: ${{ github.event.inputs.environment }}
+          GAMMA_UAT_LOGIN_URL: ${{ secrets.GAMMA_UAT_LOGIN_URL }}
+          GAMMA_UAT_USERNAME: ${{ secrets.GAMMA_UAT_USERNAME }}
+          GAMMA_UAT_PASSWORD: ${{ secrets.GAMMA_UAT_PASSWORD }}
+          GAMMA_LIVE_LOGIN_URL: ${{ secrets.GAMMA_LIVE_LOGIN_URL }}
+          GAMMA_LIVE_USERNAME: ${{ secrets.GAMMA_LIVE_USERNAME }}
+          GAMMA_LIVE_PASSWORD: ${{ secrets.GAMMA_LIVE_PASSWORD }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        run: python gamma_login.py
+
+      - name: Upload debug screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screens
+          path: debug_screens/
+          retention-days: 7
